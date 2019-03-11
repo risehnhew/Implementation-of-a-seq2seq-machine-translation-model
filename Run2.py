@@ -33,12 +33,13 @@ learn.add_argument('--hidden_size', type = int, default = 256, help = 'size of h
 lang = parser.add_argument_group('language processing options')
 lang.add_argument('--MAX_LENGTH', type = int, default = 10, help = ' Here the maximum length is 10 words to simplify training.')
 lang.add_argument('--data_path', type = str, default = 'data/%s-%s.txt', help = 'Path of training data' )
-
+lang.add_argument('--input_lang',type = str, default = 'eng', help = 'input language name')
+lang.add_argument('--output-lang', type = str, default = 'spa', help = 'output language name')
 
 #Training arguments
 trainArgs = parser.add_argument_group('Training argument')
-trainArgs.add_argument('--n_iters', type = int, default = 75000, help = 'number of iters times') #75000
-trainArgs.add_argument('--print_every', type = int, default = 5000, help = 'to print results after how many times run ') # 5000
+trainArgs.add_argument('--n_iters', type = int, default = 7500, help = 'number of iters times') #75000
+trainArgs.add_argument('--print_every', type = int, default = 500, help = 'to print results after how many times run ') # 5000
 
 args = parser.parse_args()
 
@@ -149,7 +150,7 @@ def prepareData(lang1, lang2, reverse=False):   # reverse may improve the result
     return input_lang, output_lang, pairs
 
 
-input_lang, output_lang, pairs = prepareData('eng', 'fra', True)  # input langauage pairs. Datasets from https://www.manythings.org/anki/
+input_lang, output_lang, pairs = prepareData(args.input_lang, args.output_lang, True)  # input langauage pairs. Datasets from https://www.manythings.org/anki/
 print(random.choice(pairs))
 
 
@@ -344,8 +345,8 @@ def trainIters(encoder, decoder, n_iters, print_every=100, plot_every=10, learni
             plot_loss_total = 0
 
     showPlot(plot_losses)
-    torch.save(encoder.state_dict(), './model_parameters/encoder.weights') #Returns a dictionary containing a whole state of the module.
-    torch.save(decoder.state_dict(), './model_parameters/decoder.weights')
+    #torch.save(encoder.state_dict(), './model_parameters/encoder.weights') #Returns a dictionary containing a whole state of the module.
+    #torch.save(decoder.state_dict(), './model_parameters/decoder.weights')
 #------------------------------------------------------------------------------
 # plot the result   
     
@@ -416,15 +417,24 @@ def evaluateRandomly(encoder, decoder, n=10):
 encoder1 = EncoderRNN(input_lang.n_words, args.hidden_size).to(device) # Enconder
 attn_decoder1 = AttnDecoderRNN(args.hidden_size, output_lang.n_words, dropout_p=args.dropout).to(device)#decoder
 
-#if torch.cuda.device_count() >1:
+
+#------------Load trained weights-------------------------------
+encoder1.load_state_dict(torch.load('./model_parameters/encoder.weights'))
+attn_decoder1.load_state_dict(torch.load('./model_parameters/decoder.weights'))
+
+encoder1 = encoder1.eval()
+attn_decoder1 = attn_decoder1.eval()
+#------------------------------------------------------
+
+#if torch.cuda.device_count() >1: # Multi-GPUs
 #    print("Let's use", torch.cuda.device_count(),"GPUs!")
 #    encoder1 = nn.DataParallel(encoder1)
 #    attn_decoder1 = nn.DataParallel(attn_decoder1)
 #encoder1.to(device)
 #attn_decoder1.to(device)
 
-trainIters(encoder1, attn_decoder1, args.n_iters, print_every=args.print_every)  # hyperparameters
 
+trainIters(encoder1, attn_decoder1, args.n_iters, print_every=args.print_every)  # hyperparameters
 evaluateRandomly(encoder1, attn_decoder1)
 
 
